@@ -64,26 +64,28 @@ class Boat:
         donnes_instant=self.__Z[compteur]
         self.__dot_mesures.set_data(donnes_instant[1], donnes_instant[0])
     def prediction_et_maj(self, compteur):
+        #Les matrices U, Q, R sont définies arbitrairement, je ne sais pas comment les déterminer
+        #La matrice P est elle aussi définit arbitrairement mais comme elle est ajustée à chaque itération c'est beaucoup moins important
         U = 0.1*np.ones((4,1)) #matrice des incertitudes du modèle
-        P = np.identity(4) #matrice de covariance arbitrairement grande
-        Q = np.identity(4) #matrice de covariance incluant le bruit
-        H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
+        Q = 0.1*np.identity(4) #matrice de covariance incluant le bruit
         R = 0.1*np.identity(4) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+        P = np.identity(4) #matrice de covariance arbitrairement grande
+        H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
 
         #prediction
-        delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001
+        delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001 #temps écoulé entre 2 positions mesurées (en secondes)
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
-        Xprime = np.dot(F, self.__X) + U
-        print("Xprime : " + str(Xprime))
-        Pprime = np.dot(np.dot(F, P), F.transpose())
+        Xprime = np.dot(F, self.__X) + U #position donnée par le modèle
+        print("Xprime': " + str(Xprime))
+        Pprime = np.dot(np.dot(F, P), F.transpose()) + Q
         print("Pprime : " + str(Pprime))
         #mise a jour
-        Y=self.__Z[compteur]-np.dot(H, Xprime)
-        print("Y : " + str(Y))
-        S=np.dot(np.dot(H, Pprime), H.transpose()) + R
-        K=np.dot(np.dot(Pprime, H.transpose()), S.transpose())#gain de Kalman
+        I=self.__Z[compteur]-np.dot(H, Xprime)#innovation
+        print("I : " + str(I))
+        S=np.dot(np.dot(H, Pprime), H.transpose()) + R #erreur estimée du système
+        K=np.dot(np.dot(Pprime, H.transpose()), np.linalg.inv(S))#gain de Kalman
         print("K : " + str(K))
-        self.__X = Xprime + np.dot(K, Y)
+        self.__X = Xprime + np.dot(K, I)
         P = np.dot((np.identity(4)-np.dot(K, H)), Pprime)
         self.__dot_kalman.set_data(self.__X[1], self.__X[0])
 
