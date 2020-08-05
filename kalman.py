@@ -4,6 +4,12 @@ time_scale=100 #time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
 echelle_vitesse=0.5 #echelle d'affichage du vecteur vitesse
 rayon_terrestre=6371000
 
+#changer la localisation de l'étude :
+latitude_min=-90#55
+latitude_max=90#65
+longitude_min=-180#-155
+longitude_max=180#-145
+
 #DEBUG
 frame_offset=0 #temps en secondes
 
@@ -14,16 +20,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.widgets as widget
+import time
+
 import cartopy.crs as ccrs #à installer avec "pip install Cartopy-0.18.0-cp38-cp38-win_amd64.whl" (problèmes de dépendances si installé depuis les dépots de Python)
 
-
+#Bases
 data=[] #contient les données du fichier d'entrée
 len_data=0
 boats={} #se remplit des bateaux détectés au fur et à mesure
 
+#Trajectoires
 tempstemps=[]
 latitude_mesure=[]
 latitude_kalman=[]
+
+#Ecarts
+dreel=0 #distance réelle par rapport à l'origine
+d=0 #distance Kalman par rapport à l'origine
+M=[] #liste des écarts pour faire moyenne
+MM=[] #liste des moyennes
+
+interval_modelisation=50 #intervalle entre deux appels de la fonction 'onclick' par le timer (en ms)
 
 class Boat:
     def __init__(self, mmsi, z, t):
@@ -61,6 +78,7 @@ class Boat:
         self.__temps=temps_sorted
         self.__Z=new_Z
     def plot_mesures(self, compteur):
+        global dreel
         donnes_instant=self.__Z[compteur]
         self.__dot_mesures.set_data(donnes_instant[1], donnes_instant[0])
 
@@ -68,27 +86,33 @@ class Boat:
         self.__traj_mesures[0].append(donnes_instant[0])
         plt.plot(self.__traj_mesures[1],self.__traj_mesures[0], color='blue')
 
+        dreel=np.sqrt(donnes_instant[1]**2+ donnes_instant[0]**2)
+
     def prediction_et_maj(self, compteur):
-        #Les matrices U, Q, R sont définies arbitrairement, je ne sais pas comment les déterminer
-        #La matrice P est elle aussi définit arbitrairement mais comme elle est ajustée à chaque itération c'est beaucoup moins important
-        U = np.zeros(4)#U = np.array([[0.1],[0.1],[0.001],[0.001]]) #matrice des incertitudes du modèle
-        Q = 0.1*np.identity(4) #matrice de covariance incluant le bruit
-        R = 0.1*np.identity(4) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+        global d
+        U = np.array([[0.1],[0.1],[0.001],[0.001]]) #matrice des incertitudes du modèle
         P = np.identity(4) #matrice de covariance arbitrairement grande
+        Q = np.identity(4) #matrice de covariance incluant le bruit
         H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
+        R = 0.1*np.identity(4) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
 
         #prediction
-        delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001 #temps écoulé entre 2 positions mesurées (en secondes)
+        delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
-        Xprime = np.dot(F, self.__X) + U #position donnée par le modèle
-        Pprime = np.dot(np.dot(F, P), F.transpose()) + Q
+        Xprime = np.dot(F, self.__X) + U
+        print("Xprime : " + str(Xprime))
+        Pprime = np.dot(np.dot(F, P), F.transpose())+Q
+        print("Pprime : " + str(Pprime))
         #mise a jour
-        I=self.__Z[compteur]-np.dot(H, Xprime)#innovation
-        S=np.dot(np.dot(H, Pprime), H.transpose()) + R #erreur estimée du système
+        Y=self.__Z[compteur]-np.dot(H, Xprime)
+        print("Y : " + str(Y))
+        S=np.dot(np.dot(H, Pprime), H.transpose()) + R
         K=np.dot(np.dot(Pprime, H.transpose()), np.linalg.inv(S))#gain de Kalman
-        self.__X = Xprime + np.dot(K, I)
+        print("K : " + str(K))
+        self.__X = Xprime + np.dot(K, Y)
         P = np.dot((np.identity(4)-np.dot(K, H)), Pprime)
         self.__dot_kalman.set_data(self.__X[1], self.__X[0])
+        d=np.sqrt(self.__X[1]**2+ self.__X[0]**2)
 
         self.__traj_kalman[1].append(self.__X[1])
         self.__traj_kalman[0].append(self.__X[0])
@@ -127,19 +151,46 @@ def load_data(input_file, data):
     for keys in boats:
         boats[keys].organiser()
 
+def ecart():
+    ec=d[0]-dreel[0]
+    M.append(float(ec))
+    print("écart :"+str(ec))
+def moyenne(M):
+    som=0
+    for i in M:
+        som+=i
+    return som/len(M)
 
 def onclick(event):
     bateau=boats["351925000"]
-    time = bateau.next()
-    bateau.centrer()
-    plt.title(time)
+    try :
+        temps = bateau.next()
+        bateau.centrer()
+        ecart()
+        print("Moyenne:"+str(moyenne(M)))
+        MM.append(float(moyenne(M)))
+        plt.title(temps)
+    except IndexError:
+        print("Fin de liste atteinte")
+        timer.stop()
 
-fig = plt.figure() #il faut créer une figure pour l'animation (j'ai pas tout compris au fonctionnement de mathplot.pyplot. J'ai l'impression qu'il y a beaucoup d'objets qui font sensiblement la même chose
+def graph(event):
+    plt.clf()
+    plt.cla()
+    plt.close()
+    plt.plot(np.linspace(0,len(MM),len(MM)),np.array(MM))
+    plt.title("La moyenne des écarts")
+    plt.show()
+
+fig = plt.figure() #il faut créer une figure pour l'animation
 ax = plt.axes(projection=ccrs.PlateCarree(), autoscale_on=False)
 ax.coastlines() #dessine la carte
 ax.set_aspect('equal') #évite la déformation de la carte
 
-connection_id = fig.canvas.mpl_connect('button_press_event', onclick)
+timer = fig.canvas.new_timer(interval=interval_modelisation)
+timer.add_callback(onclick,'a')
+timer.start()
+coom_id=fig.canvas.mpl_connect('key_press_event',graph)
 
 load_data(input_file, data)
 len_data=len(data)
@@ -151,3 +202,4 @@ def init():
 ani = animation.FuncAnimation(fig, update, interval=interval, blit=True, init_func=init) #cette fonction permet d'appeler la fonction "update" tous les interval ms
 
 plt.show() #affiche la fenetre
+
