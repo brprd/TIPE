@@ -175,11 +175,15 @@ def onclick(event):
         timer.stop()
 
 def graph(event):
+    timer.stop()
     plt.clf()
     plt.cla()
     plt.close()
     plt.plot(np.linspace(0,len(MM),len(MM)),np.array(MM))
-    plt.title("La moyenne des écarts")
+    plt.title("La moyenne des écarts en fonction des instants de mesure")
+    ax=plt.axes()
+    ax.set_ylabel('Moyenne des écarts (en m)')
+    ax.set_xlabel("nombre d'instants de mesure")
     plt.show()
 
 fig = plt.figure() #il faut créer une figure pour l'animation
