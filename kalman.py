@@ -4,12 +4,6 @@ time_scale=100 #time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
 echelle_vitesse=0.5 #echelle d'affichage du vecteur vitesse
 rayon_terrestre=6371000
 
-#changer la localisation de l'étude :
-latitude_min=-90#55
-latitude_max=90#65
-longitude_min=-180#-155
-longitude_max=180#-145
-
 #DEBUG
 frame_offset=0 #temps en secondes
 
@@ -27,6 +21,10 @@ data=[] #contient les données du fichier d'entrée
 len_data=0
 boats={} #se remplit des bateaux détectés au fur et à mesure
 
+tempstemps=[]
+latitude_mesure=[]
+latitude_kalman=[]
+
 class Boat:
     def __init__(self, mmsi, z, t):
         self.__mmsi = mmsi
@@ -36,6 +34,8 @@ class Boat:
         self.__dot_mesures, = plt.plot([],[], marker='o',color='blue',markersize=5) #le point représentant le bateau sur la carte (coordonnées mesurées)
         self.__dot_kalman, = plt.plot([],[], marker='x',color='green',markersize=5) #le point représentant le bateau sur la carte (coordonnées mesurées)
         self.__compteur=0 #compteur pour next()
+        self.__traj_mesures=[[],[]]
+        self.__traj_kalman=[[],[]]
     def append(self, z, t):
         self.__Z.append(z)
         self.__temps.append(t)
@@ -63,10 +63,15 @@ class Boat:
     def plot_mesures(self, compteur):
         donnes_instant=self.__Z[compteur]
         self.__dot_mesures.set_data(donnes_instant[1], donnes_instant[0])
+
+        self.__traj_mesures[1].append(donnes_instant[1])
+        self.__traj_mesures[0].append(donnes_instant[0])
+        plt.plot(self.__traj_mesures[1],self.__traj_mesures[0], color='blue')
+
     def prediction_et_maj(self, compteur):
         #Les matrices U, Q, R sont définies arbitrairement, je ne sais pas comment les déterminer
         #La matrice P est elle aussi définit arbitrairement mais comme elle est ajustée à chaque itération c'est beaucoup moins important
-        U = 0.1*np.ones((4,1)) #matrice des incertitudes du modèle
+        U = np.zeros(4)#U = np.array([[0.1],[0.1],[0.001],[0.001]]) #matrice des incertitudes du modèle
         Q = 0.1*np.identity(4) #matrice de covariance incluant le bruit
         R = 0.1*np.identity(4) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
         P = np.identity(4) #matrice de covariance arbitrairement grande
@@ -76,18 +81,18 @@ class Boat:
         delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001 #temps écoulé entre 2 positions mesurées (en secondes)
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
         Xprime = np.dot(F, self.__X) + U #position donnée par le modèle
-        print("Xprime': " + str(Xprime))
         Pprime = np.dot(np.dot(F, P), F.transpose()) + Q
-        print("Pprime : " + str(Pprime))
         #mise a jour
         I=self.__Z[compteur]-np.dot(H, Xprime)#innovation
-        print("I : " + str(I))
         S=np.dot(np.dot(H, Pprime), H.transpose()) + R #erreur estimée du système
         K=np.dot(np.dot(Pprime, H.transpose()), np.linalg.inv(S))#gain de Kalman
-        print("K : " + str(K))
         self.__X = Xprime + np.dot(K, I)
         P = np.dot((np.identity(4)-np.dot(K, H)), Pprime)
         self.__dot_kalman.set_data(self.__X[1], self.__X[0])
+
+        self.__traj_kalman[1].append(self.__X[1])
+        self.__traj_kalman[0].append(self.__X[0])
+        plt.plot(self.__traj_kalman[1],self.__traj_kalman[0], color='green')
 
 def load_data(input_file, data):
     with open(input_file, 'r', newline='') as input:
@@ -108,7 +113,7 @@ def load_data(input_file, data):
             COG=float(row[5])*0.017 #1 deg ~= 0.01745329251994329576923690768489 rad
 
             lat_point=SOG*np.cos(COG)/rayon_terrestre
-            lon_point=(SOG*np.sin(COG))/(rayon_terrestre*np.cos(lat)) #on considèrera que cos(lat) ne varie pas entre 2 mesures
+            lon_point=(SOG*np.sin(COG))/(rayon_terrestre*np.cos(lat)) #on considèrera que cos(lat) ne varie pas entre 2 mesures consécutives
 
 
             t=int(hours*3600+minuts*60+seconds)
@@ -130,7 +135,7 @@ def onclick(event):
     plt.title(time)
 
 fig = plt.figure() #il faut créer une figure pour l'animation (j'ai pas tout compris au fonctionnement de mathplot.pyplot. J'ai l'impression qu'il y a beaucoup d'objets qui font sensiblement la même chose
-ax = plt.axes(projection=ccrs.PlateCarree(), autoscale_on=False, xlim=(longitude_min, longitude_max), ylim=(latitude_min, latitude_max))
+ax = plt.axes(projection=ccrs.PlateCarree(), autoscale_on=False)
 ax.coastlines() #dessine la carte
 ax.set_aspect('equal') #évite la déformation de la carte
 
