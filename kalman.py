@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.widgets as widget
 import time
+import random as rd
 
 import cartopy.crs as ccrs #à installer avec "pip install Cartopy-0.18.0-cp38-cp38-win_amd64.whl" (problèmes de dépendances si installé depuis les dépots de Python)
 
@@ -28,23 +29,27 @@ import cartopy.crs as ccrs #à installer avec "pip install Cartopy-0.18.0-cp38-c
 data=[] #contient les données du fichier d'entrée
 len_data=0
 boats={} #se remplit des bateaux détectés au fur et à mesure
+MMSI=[]
 
 #Trajectoires
 tempstemps=[]
 latitude_mesure=[]
 latitude_kalman=[]
+seed_BBG=100 #définit l'intervalle pour le bruit blanc gaussien
 
 #Ecarts
 dreel=0 #distance réelle par rapport à l'origine
 d=0 #distance Kalman par rapport à l'origine
 M=[] #liste des écarts pour faire moyenne
 MM=[] #liste des moyennes
+interrupteur=True # ne pas toucher
 
 interval_modelisation=50 #intervalle entre deux appels de la fonction 'onclick' par le timer (en ms)
 
 class Boat:
     def __init__(self, mmsi, z, t):
         self.__mmsi = mmsi
+        MMSI.append(mmsi)
         self.__Z = [z] #mesures AIS pour chaque instant listé dans self.__temps : latitude, longitude, latitude_point, longitude_point
         self.__temps = [t] #liste des temps auxquelles le bateau envoie des données AIS
         self.__X = z #état du bateau donné par le filtre (au début, on prend l'état donné par les mesures)
@@ -99,9 +104,10 @@ class Boat:
         #prediction
         delta_t = (self.__temps[compteur]-self.__temps[compteur-1])*0.001
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
-        Xprime = np.dot(F, self.__X) + U
+        Xprime = np.dot(F, self.__X)
         print("Xprime : " + str(Xprime))
-        Pprime = np.dot(np.dot(F, P), F.transpose())+Q
+        """Q=np.array([[BG(seed_BBG),0,0,0],[0,BG(seed_BBG),0,0],[0,0,BG(seed_BBG),0],[0,0,0,BG(seed_BBG)]])"""
+        Pprime = np.dot(np.dot(F, P), F.transpose())+BG(seed_BBG)*Q
         print("Pprime : " + str(Pprime))
         #mise a jour
         Y=self.__Z[compteur]-np.dot(H, Xprime)
@@ -160,31 +166,59 @@ def moyenne(M):
     for i in M:
         som+=i
     return som/len(M)
+#ne pas toucher
+def trigger():
+    global interrupteur
+    if interrupteur==True:
+        interrupteur=False
+    else:
+        interrupteur=True
+
+#Bruit blanc gaussien
+def BG(n):
+    global W1
+    global W2
+    inte=interrupteur
+    if inte==True:
+        C1=2*np.pi*rd.random()*n
+        C2=np.abs(2*np.log(rd.random()*n))
+        C2=np.sqrt(C2)
+        W2=C2*np.cos(C1)
+        W1=C2*np.sin(C1)
+        trigger()
+        return W1
+
+    else:
+        trigger()
+        return W2
 
 def onclick(event):
-    bateau=boats["351925000"]
-    try :
-        temps = bateau.next()
-        bateau.centrer()
-        ecart()
-        print("Moyenne:"+str(moyenne(M)))
-        MM.append(float(moyenne(M)))
-        plt.title(temps)
+    try:
+        bateau=boats["351925000"]
+        try :
+            temps = bateau.next()
+            bateau.centrer()
+            ecart()
+            print("Moyenne:"+str(moyenne(M)))
+            MM.append(float(moyenne(M)))
+            plt.title(temps)
+        except IndexError:
+            print("Fin de liste atteinte")
+            timer.stop()
     except IndexError:
-        print("Fin de liste atteinte")
-        timer.stop()
-
+        print("Bateau introuvable")
 def graph(event):
     timer.stop()
     plt.clf()
     plt.cla()
     plt.close()
-    plt.plot(np.linspace(0,len(MM),len(MM)),np.array(MM))
-    plt.title("La moyenne des écarts en fonction des instants de mesure")
+    plt.plot(np.linspace(0,len(M),len(M)),np.array(M))
+    plt.title("Les écarts à chaque instant de mesure")
     ax=plt.axes()
-    ax.set_ylabel('Moyenne des écarts (en m)')
-    ax.set_xlabel("nombre d'instants de mesure")
+    ax.set_ylabel('Écarts (en m)')
+    ax.set_xlabel("Nombre d'instants de mesure")
     plt.show()
+    print(moyenne(M))
 
 fig = plt.figure() #il faut créer une figure pour l'animation
 ax = plt.axes(projection=ccrs.PlateCarree(), autoscale_on=False)
