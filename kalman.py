@@ -177,7 +177,6 @@ ax.set_aspect('equal') #évite la déformation de la carte
 coom_id=fig.canvas.mpl_connect('key_press_event',graph)
 
 ani = animation.FuncAnimation(fig, update, interval=interval) #cette fonction permet d'appeler la fonction "update" tous les interval ms
-ani.event_source.stop()
 
 load_data(input_file, data)
 len_data=len(data)
