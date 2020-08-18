@@ -154,6 +154,7 @@ def update(frame):
             plt.title(temps)
         except IndexError:
             print("Fin de liste atteinte")
+            anim.event_source.stop()
     except IndexError:
         print("Bateau introuvable")
     return []
@@ -176,11 +177,11 @@ ax.set_aspect('equal') #évite la déformation de la carte
 
 coom_id=fig.canvas.mpl_connect('key_press_event',graph)
 
-ani = animation.FuncAnimation(fig, update, interval=interval) #cette fonction permet d'appeler la fonction "update" tous les interval ms
+anim = animation.FuncAnimation(fig, update, interval=interval) #cette fonction permet d'appeler la fonction "update" tous les interval ms
+
 
 load_data(input_file, data)
 len_data=len(data)
 
 
 plt.show() #affiche la fenetre
-
