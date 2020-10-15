@@ -91,31 +91,8 @@ class Bateau_commande:
         acc_lon = 0.01
         self.calculer_position()
         vecteur = self.__liste_vecteurs.pop()
-            self.__liste_vecteurs.append([vecteur[0], vecteur[1], vecteur[2], vecteur[3]+acc_lat*accelerations[0], vecteur[4]+acc_lon*accelerations[1]])
-            self.calculer_position()
-
-# class Bateau_commande2:
-#     def __init__(self, mmsi, latitude_initiale, longitude_initiale):
-#         self.__mmsi=mmsi
-#         self.__dot, = ax.plot([],[], marker='o',color='red',markersize=5) #le point représentant le bateau sur la carte
-#         instant=time.time()
-#         self.__vecteur = [instant, latitude_initiale, longitude_initiale, 0.0, 0.0]
-#         self.calculer_position()
-#     def calculer_position(self):
-#         vecteur = self.__vecteur
-#         nouvel_instant = time.time()
-#         delta_t = nouvel_instant - vecteur[0]
-#         self.__vecteur = [nouvel_instant, vecteur[1]+delta_t*vecteur[3], vecteur[2]+delta_t*vecteur[4], vecteur[3], vecteur[4]]
-#         self.__dot.set_data(self.__vecteur[2], self.__vecteur[1])
-#     def accelerer(self, accelerations):
-#         acc_lat = 0.01#"accélération" latitudinale : ce n'est pas une vraie accélération au sens où elle n'a pas de dimension temporelle
-#         acc_lon = 0.01
-#         self.calculer_position()
-#         vecteur = self.__vecteur
-#         self.__vecteur = [vecteur[0], vecteur[1], vecteur[2], vecteur[3]+acc_lat*accelerations[0], vecteur[4]+acc_lon*accelerations[1]]
-#         self.calculer_position()
-#         time.sleep(0.5)
-#         print("acceleration")
+        self.__liste_vecteurs.append([vecteur[0], vecteur[1], vecteur[2], vecteur[3]+acc_lat*accelerations[0], vecteur[4]+acc_lon*accelerations[1]])
+        self.calculer_position()
 
 
 def update(frame):
