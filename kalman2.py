@@ -1,8 +1,9 @@
 input_file='bdd.csv'
 RT = 6311000 #rayon de la Terre (en m)
 pi=3.141592
+facteur_securite=100#l'ellipse de securite est facteur_securite fois plus grande que l'ellipse de variance
 
-time_scale=1000 #time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
+time_scale=1000#time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
 
 #changer la localisation de l'étude :
 latitude_min=55
@@ -72,13 +73,17 @@ class Boat:
 
         #pour le filtre de Kalman
         self.kal_vecteur=vecteur[1:] #[latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
-        self.kal_Q = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance du bruit du modèle physique
+        self.kal_Q = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance du bruit du modèle physique
+        #self.kal_Q = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance du bruit du modèle physique
         self.kal_H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
-        self.kal_R = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+        self.kal_R = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+        #self.kal_R = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
         self.kal_P = np.identity(4) #matrice de covariance de l'état estimé, arbitrairement grande au départ
         self.kal_line, = ax.plot([], [], color='green', markersize=5)
         self.kal_ellipse = Ellipse((self.kal_vecteur[1], self.kal_vecteur[0]), height=0, width=0, color='green', fill=False)
+        self.ellipse_de_securite = Ellipse((self.kal_vecteur[1], self.kal_vecteur[0]), height=0, width=0, color='red', fill=False)
         ax.add_patch(self.kal_ellipse)
+        ax.add_patch(self.ellipse_de_securite)
 
         self.append(vecteur)
     def append(self, vecteur):
@@ -108,6 +113,10 @@ class Boat:
         self.kal_ellipse.height=self.kal_P[0][0]
         self.kal_ellipse.width=self.kal_P[1][1]
         self.kal_ellipse.center=(self.kal_vecteur[1], self.kal_vecteur[0])
+
+        self.ellipse_de_securite.height=self.kal_P[0][0]*facteur_securite
+        self.ellipse_de_securite.width=self.kal_P[1][1]*facteur_securite
+        self.ellipse_de_securite.center=(self.kal_vecteur[1], self.kal_vecteur[0])
     def prediction(self):
         delta_t = 3600
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
