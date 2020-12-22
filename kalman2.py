@@ -1,7 +1,6 @@
 input_file='bdd.csv'
 RT = 6311000 #rayon de la Terre (en m)
 pi=3.141592
-facteur_securite=100#l'ellipse de securite est facteur_securite fois plus grande que l'ellipse de variance
 
 time_scale=1000#time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
 
@@ -10,16 +9,10 @@ latitude_min=55
 latitude_max=65
 longitude_min=-165
 longitude_max=-145
-# latitude_min=57
-# latitude_max=59
-# longitude_min=-152
-# longitude_max=-150
-
-#DEBUG
-frame_offset=0 #temps en secondes
 
 
 interval=int(1000/time_scale) #ne pas toucher, modifier time_scale au-dessus
+frame_offset=0
 
 import csv
 import numpy as np
@@ -33,6 +26,13 @@ import time
 data=[] #contient les données du fichier d'entrée
 boats={} #se remplit des bateaux détectés au fur et à mesure
 bateau_commande=False
+
+#produit matriciel
+def produit(ARRAY):
+    P = np.identity(4)
+    for M in ARRAY:
+        P = np.dot(P,M)
+    return P
 
 #charger données
 with open(input_file, 'r', newline='') as input:
@@ -61,92 +61,80 @@ with open(input_file, 'r', newline='') as input:
             data.append([]) #secondes pendant lesquelles rien est reçu
         data[temps].append([mmsi,[temps, latitude, longitude, vitesse_lat, vitesse_lon]])
 
-
 len_data=len(data)
 
+
 class Boat:
-    def __init__(self, mmsi, vecteur): #vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
-        self.mmsi = mmsi
-        self.liste_vecteurs = []
-        self.dot, = ax.plot([],[], marker='o',color='blue',markersize=5) #le point représentant le bateau sur la carte
-        self.kal_dot, = ax.plot([],[], marker='x',color='green',markersize=5) #le point représentant le bateau sur la carte
+    kal_Q = 1e-5*np.array([[1e-5,0,0,0],[0,1e-5,0,0],[0,0,1e-5,0],[0,0,0,1e-5]]) #matrice de covariance du bruit du modèle physique
+    kal_R = np.array([[1e-5,0,0,0],[0,1e-5,0,0],[0,0,0.1e-5,0],[0,0,0,1e-5]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+    def __init__(self, mmsi, vecteur):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
+        self.__mmsi = mmsi
+        self.__liste_vecteurs = []#avec cette liste, on garde l'historique des positions de chaque bateau
+        self.__dot, = ax.plot([],[], marker='o',color='blue',markersize=5, picker=True) #le point représentant la position fournie pas l'AIS sur la carte
+        self.__kal_dot, = ax.plot([],[], marker='x',color='green',markersize=5) #le point représentant l'estimation du filtre de Kalman
 
         #pour le filtre de Kalman
-        self.kal_vecteur=vecteur[1:] #[latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
-        self.kal_Q = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance du bruit du modèle physique
-        #self.kal_Q = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance du bruit du modèle physique
-        self.kal_H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
-        self.kal_R = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
-        #self.kal_R = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
-        self.kal_P = np.identity(4) #matrice de covariance de l'état estimé, arbitrairement grande au départ
-        self.kal_line, = ax.plot([], [], color='green', markersize=5)
-        self.kal_ellipse = Ellipse((self.kal_vecteur[1], self.kal_vecteur[0]), height=0, width=0, color='green', fill=False)
-        self.ellipse_de_securite = Ellipse((self.kal_vecteur[1], self.kal_vecteur[0]), height=0, width=0, color='red', fill=False)
-        ax.add_patch(self.kal_ellipse)
-        ax.add_patch(self.ellipse_de_securite)
+        self.__kal_vecteur=vecteur[1:] #[latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
+
+        self.__kal_P = np.identity(4) #matrice de covariance de l'état estimé, arbitrairement grande au départ
+        self.__kal_line, = ax.plot([], [], color='green', markersize=5)
+        self.__kal_ellipse = Ellipse((self.__kal_vecteur[1], self.__kal_vecteur[0]), height=0, width=0, color='green', fill=False)#incertitude sur
+        self.__ellipse_p = Ellipse((self.__kal_vecteur[1], self.__kal_vecteur[0]), height=0, width=0, color='red', fill=False)#ellipse de prédiction
+
+        #trace les deux ellipses
+        ax.add_patch(self.__kal_ellipse)
+        ax.add_patch(self.__ellipse_p)
+
+        #pour pouvoir cliquer sur le bateau et en afficher les infos
+        self.__dot.set_pickradius(2.5)
+        fig.canvas.mpl_connect('pick_event', self.__onpick)
 
         self.append(vecteur)
-    def append(self, vecteur):
-        self.liste_vecteurs.append(vecteur)
-        self.tracer()
-        if len(self.liste_vecteurs) >= 2:
-            self.kalman()
-            self.prediction()
-    def tracer(self):
-        self.dot.set_data(self.liste_vecteurs[-1][2], self.liste_vecteurs[-1][1])
-    def kalman(self):
-        #"prediction"
-        vecteur1 = self.liste_vecteurs[-2]
-        vecteur2 = self.liste_vecteurs[-1]
+    def append(self, vecteur):#met à jour le bateau avec le vecteur passé en paramètre
+        self.__liste_vecteurs.append(vecteur)
+        self.__dot.set_data(self.__liste_vecteurs[-1][2], self.__liste_vecteurs[-1][1])#modifie la position AIS affichée
+        if len(self.__liste_vecteurs) >= 2:
+            self.__kalman()#calcule et affiche la position estimée du bateau à l'instant même
+            self.__predire(900)#prédit et affiche la position du bateau dans 1/4 d'heure (900 secondes)
+    def __prediction(self, delta_t):#la phase prédiction du filtre de Kalman
+        F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
+        kal_vecteur_prime = produit((F, self.__kal_vecteur))
+        kal_P_prime = produit((F, self.__kal_P, F.T)) + Boat.kal_Q
+        return kal_vecteur_prime, kal_P_prime
+    def __kalman(self):#le filtre
+        #"__prediction"
+        vecteur1 = self.__liste_vecteurs[-2]
+        vecteur2 = self.__liste_vecteurs[-1]
         delta_t = vecteur2[0]-vecteur1[0]
-        F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
-        kal_vecteur_prime = np.dot(F, self.kal_vecteur)
-        kal_P_prime = np.dot(np.dot(F, self.kal_P), F.transpose()) + self.kal_Q
-        #mise a jour
-        Y=vecteur2[1:]-np.dot(self.kal_H, kal_vecteur_prime)
-        S=np.dot(np.dot(self.kal_H, kal_P_prime), self.kal_H.transpose()) + self.kal_R
-        K=np.dot(np.dot(kal_P_prime, self.kal_H.transpose()), np.linalg.inv(S))#gain de Kalman
-        self.kal_vecteur = kal_vecteur_prime + np.dot(K, Y)
-        self.kal_P = np.dot((np.identity(4)-np.dot(K, self.kal_H)), kal_P_prime)
 
-        self.kal_dot.set_data(self.kal_vecteur[1], self.kal_vecteur[0])
-        self.kal_ellipse.height=self.kal_P[0][0]
-        self.kal_ellipse.width=self.kal_P[1][1]
-        self.kal_ellipse.center=(self.kal_vecteur[1], self.kal_vecteur[0])
+        kal_vecteur_prime, kal_P_prime = self.__prediction(delta_t)
 
-        self.ellipse_de_securite.height=self.kal_P[0][0]*facteur_securite
-        self.ellipse_de_securite.width=self.kal_P[1][1]*facteur_securite
-        self.ellipse_de_securite.center=(self.kal_vecteur[1], self.kal_vecteur[0])
-    def prediction(self):
-        delta_t = 3600
-        F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
-        kal_vecteur_prime = np.dot(F, self.kal_vecteur)
-        #kal_P_prime = np.dot(np.dot(F, self.kal_P), F.transpose()) + self.kal_Q
-        self.kal_line.set_data([self.liste_vecteurs[-1][2], kal_vecteur_prime[1]], [self.liste_vecteurs[-1][1], kal_vecteur_prime[0]])
+        #"mise a jour"
+        K=np.dot(kal_P_prime, np.linalg.inv(kal_P_prime + Boat.kal_R))#gain de Kalman optimal
+        self.__kal_vecteur = kal_vecteur_prime + produit((K, vecteur2[1:]-kal_vecteur_prime))
+        self.__kal_P = produit((np.identity(4)-K, kal_P_prime, np.identity(4)-K.T)) + produit((K, Boat.kal_R, np.transpose(K)))
 
+        self.__kal_dot.set_data(self.__kal_vecteur[1], self.__kal_vecteur[0])
+        self.__kal_ellipse.height=4*np.sqrt(self.__kal_P[0][0])
+        self.__kal_ellipse.width=4*np.sqrt(self.__kal_P[1][1])
+        self.__kal_ellipse.center=(self.__kal_vecteur[1], self.__kal_vecteur[0])
+    def __predire(self, t):#prédit et affiche la position du bateau au bout de t secondes
+        kal_vecteur_prime, kal_P_prime = self.__prediction(t)
 
+        self.__kal_line.set_data([self.__liste_vecteurs[-1][2], kal_vecteur_prime[1]], [self.__liste_vecteurs[-1][1], kal_vecteur_prime[0]])
+        self.__ellipse_p.height=4*np.sqrt(kal_P_prime[0][0])
+        self.__ellipse_p.width=4*np.sqrt(kal_P_prime[1][1])
+        self.__ellipse_p.center=(kal_vecteur_prime[1], kal_vecteur_prime[0])
+    def __onpick(self, event):#détecte le clic sur le bateau et en affiche les informations principales
+        if event.artist == self.__dot:
+            print(20*"=")
+            print("MMSI : " + str(self.__mmsi))
+            print("latitude : " + str(round(self.__liste_vecteurs[-1][1], 5)) + "°")
+            print("longitude : " + str(round(self.__liste_vecteurs[-1][2], 5)) + "°")
+            print("latitude : " + str(round(self.__kal_vecteur[0], 5)) + " ± " + str(round(2*self.__kal_P[0][0], 5)) + "°")
+            print("longitude : " + str(round(self.__kal_vecteur[1], 5)) + " ± " + str(round(2*self.__kal_P[1][1], 5)) + "°")
+            print("nombres de mesures reçues : " + str(len(self.__liste_vecteurs)))
 
-class Bateau_commande:
-    def __init__(self, mmsi, latitude_initiale, longitude_initiale):
-        self.mmsi=mmsi
-        self.dot, = ax.plot([],[], marker='o',color='red',markersize=5) #le point représentant le bateau sur la carte
-        instant=time.time()
-        self.liste_vecteurs = [[instant, latitude_initiale, longitude_initiale, 0.0, 0.0]]
-        self.calculer_position()
-    def calculer_position(self):
-        vecteur = self.liste_vecteurs[-1]
-        nouvel_instant = time.time()
-        delta_t = nouvel_instant - vecteur[0]
-        self.liste_vecteurs.append([nouvel_instant, vecteur[1]+delta_t*vecteur[3], vecteur[2]+delta_t*vecteur[4], vecteur[3], vecteur[4]])
-        self.dot.set_data(self.liste_vecteurs[-1][2], self.liste_vecteurs[-1][1])
-        plt.plot([self.liste_vecteurs[-2][2],self.liste_vecteurs[-1][2]], [self.liste_vecteurs[-2][1],self.liste_vecteurs[-1][1]], color='red')
-    def accelerer(self, accelerations):
-        acc_lat = 0.001#"accélération" latitudinale : ce n'est pas une vraie accélération au sens où elle n'a pas de dimension temporelle
-        acc_lon = 0.001
-        self.calculer_position()
-        vecteur = self.liste_vecteurs.pop()
-        self.liste_vecteurs.append([vecteur[0], vecteur[1], vecteur[2], vecteur[3]+acc_lat*accelerations[0], vecteur[4]+acc_lon*accelerations[1]])
-        self.calculer_position()
 
 
 def update(frame):
@@ -171,18 +159,45 @@ ax.coastlines() #dessine la carte
 ax.set_aspect('equal') #évite la déformation de la carte
 
 
+
+
+class Bateau_commande:
+    def __init__(self, mmsi, latitude_initiale, longitude_initiale):
+        self.__mmsi=mmsi
+        self.__dot, = ax.plot([],[], marker='o',color='purple',markersize=5) #le point représentant le bateau sur la carte
+        instant=time.time()
+        self.__liste_vecteurs = [[instant, latitude_initiale, longitude_initiale, 0.0, 0.0]]
+        self.__calculer_position()
+    def __calculer_position(self):
+        vecteur = self.__liste_vecteurs[-1]
+        nouvel_instant = time.time()
+        delta_t = nouvel_instant - vecteur[0]
+        self.__liste_vecteurs.append([nouvel_instant, vecteur[1]+delta_t*vecteur[3], vecteur[2]+delta_t*vecteur[4], vecteur[3], vecteur[4]])
+        self.__dot.set_data(self.__liste_vecteurs[-1][2], self.__liste_vecteurs[-1][1])
+        #afficher la trajectoire :
+        #plt.plot([self.__liste_vecteurs[-2][2],self.__liste_vecteurs[-1][2]], [self.__liste_vecteurs[-2][1],self.__liste_vecteurs[-1][1]], color='purple')
+    def accelerer(self, accelerations):
+        acc_lat = 0.001#"accélération" latitudinale : ce n'est pas une vraie accélération au sens où elle n'a pas de dimension temporelle
+        acc_lon = 0.001
+        self.__calculer_position()
+        vecteur = self.__liste_vecteurs.pop()
+        self.__liste_vecteurs.append([vecteur[0], vecteur[1], vecteur[2], vecteur[3]+acc_lat*accelerations[0], vecteur[4]+acc_lon*accelerations[1]])
+        self.__calculer_position()
+
+
 def on_key(event):
     global bateau_commande
     if not bateau_commande and event.key=="+":
         bateau_commande = Bateau_commande("keke des plages", event.ydata, event.xdata)
-    elif event.key=="up":
-        bateau_commande.accelerer([1,0])
-    elif event.key=="down":
-        bateau_commande.accelerer([-1,0])
-    elif event.key=="right":
-        bateau_commande.accelerer([0,1])
-    elif event.key=="left":
-        bateau_commande.accelerer([0,-1])
+    if bateau_commande:
+        if event.key=="up":
+            bateau_commande.accelerer([1,0])
+        elif event.key=="down":
+            bateau_commande.accelerer([-1,0])
+        elif event.key=="right":
+            bateau_commande.accelerer([0,1])
+        elif event.key=="left":
+            bateau_commande.accelerer([0,-1])
 
 
 cid = fig.canvas.mpl_connect('key_press_event', on_key)
