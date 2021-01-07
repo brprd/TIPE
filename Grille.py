@@ -131,12 +131,13 @@ class Boat:
         self.mmsi = mmsi
         self.liste_vecteurs = []
         self.liste_vecteurs_kalman=[]
+        self.liste_vecteurs_kalman_prediction=[]
         #pour le filtre de Kalman
         self.kal_vecteur=vecteur[1:] #[latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
-        self.kal_Q = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance du bruit du modèle physique
+        self.kal_Q = 1e-5*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
         #self.kal_Q = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance du bruit du modèle physique
         self.kal_H = np.identity(4) #matrice de transition entre le repère du capteur et le notre
-        self.kal_R = np.array([[0.00001,0,0,0],[0,0.00001,0,0],[0,0,0.0000005,0],[0,0,0,0.0000005]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+        self.kal_R = 1e-5*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
         #self.kal_R = np.array([[0.1,0,0,0],[0,0.1,0,0],[0,0,1.0,0],[0,0,0,1.0]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
         self.kal_P = np.identity(4) #matrice de covariance de l'état estimé, arbitrairement grande au départ
         self.append(vecteur)
@@ -161,12 +162,14 @@ class Boat:
         self.kal_P = np.dot((np.identity(4)-np.dot(K, self.kal_H)), kal_P_prime)
         self.liste_vecteurs_kalman.append(self.kal_vecteur)
     def prediction(self):
-        delta_t = 3600
+        delta_t = 900
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
         kal_vecteur_prime = np.dot(F, self.kal_vecteur)
+        self.liste_vecteurs_kalman_prediction.append(kal_vecteur_prime)
+
         #kal_P_prime = np.dot(np.dot(F, self.kal_P), F.transpose()) + self.kal_Q
     def get_data(self):
-        return self.liste_vecteurs, self.liste_vecteurs_kalman
+        return self.liste_vecteurs, self.liste_vecteurs_kalman_prediction
 
 
 for frame in range(len_data):
@@ -240,16 +243,16 @@ def comparaison_kalman(mmsi):
 
     plt.show()
 
-#comparaison_kalman("3337665")
+comparaison_kalman("3337665")
 
-centre_bateau("3337640",4)
+"""centre_bateau("3337640",4)
 ax = Axes3D(plt.figure())
 X = np.linspace(0,L,no)
 t = np.linspace(0,L,no)
 X, t = np.meshgrid(X, t, indexing = 'ij')
 ax.plot_surface(X, t, M, cmap='plasma')
 x=np.linspace(0,L,no)
-y=np.linspace(0,L,no)
+y=np.linspace(0,L,no)"""
 
 
 
