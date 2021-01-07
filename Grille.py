@@ -4,7 +4,7 @@ import time
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
-input_file='D:/Documents/AIS_2018_12_20/bbd.csv'
+input_file="D:/brieu/Documents/MP/TIPE/bbd_aleatoire.csv"
 RT = 6311000 #rayon de la Terre (en m)
 pi=np.pi
 n="h"
@@ -240,17 +240,17 @@ def comparaison_kalman(mmsi):
 
     plt.show()
 
+#comparaison_kalman("3337665")
 
-comparaison_kalman("3337665")
-"""centre_bateau("3337640",4)
+centre_bateau("3337640",4)
 ax = Axes3D(plt.figure())
 X = np.linspace(0,L,no)
 t = np.linspace(0,L,no)
 X, t = np.meshgrid(X, t, indexing = 'ij')
-ax.plot_surface(X, t, M)
+ax.plot_surface(X, t, M, cmap='plasma')
 x=np.linspace(0,L,no)
 y=np.linspace(0,L,no)
 
 
 
-plt.show()"""
+plt.show()

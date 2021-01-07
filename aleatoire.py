@@ -1,5 +1,8 @@
 import random
 import csv
+import numpy as np
+
+output_file="D:/brieu/Documents/MP/TIPE/bbd_aleatoire.csv"
 
 def deplacement(X,V):
     Vect=[X]
@@ -35,7 +38,7 @@ def mismatch():
     return AIS
 
 AIS=mismatch()
-with open('D:/Documents/AIS_2018_12_20/bbd.csv', 'w', newline='') as csvfile:
+with open(output_file, 'w', newline='') as csvfile:
     c = csv.writer(csvfile, delimiter=',')
     for i in range(len(AIS)):
         print(AIS[i])
