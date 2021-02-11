@@ -65,8 +65,8 @@ len_data=len(data)
 
 
 class Boat:
-    kal_Q = 1e-5*np.array([[1e-5,0,0,0],[0,1e-5,0,0],[0,0,1e-5,0],[0,0,0,1e-5]]) #matrice de covariance du bruit du modèle physique
-    kal_R = np.array([[1e-5,0,0,0],[0,1e-5,0,0],[0,0,0.1e-5,0],[0,0,0,1e-5]]) #matrice de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
+    kal_Q = 1e-7*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
+    kal_R = 1e-7*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matricee de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
     def __init__(self, mmsi, vecteur):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
         self.__mmsi = mmsi
         self.__liste_vecteurs = []#avec cette liste, on garde l'historique des positions de chaque bateau
