@@ -117,29 +117,6 @@ def __Dijkstra_tas(G,R,s):
 
 ##Affichage
 
-#def affiche_trajet(G,R,s,d):
-#     n = len(G)
-#     chemin = trajet(G,R,s,d)[1]
-#     p = len(chemin)
-#     plt.axis([-1,n,-n,1])
-#     plt.grid()
-#     plt.plot(s[1],-s[0], marker = "o", color = "g", label = "Origine")
-#     x = np.linspace(-1,n,n)
-#     y = np.linspace(-1,n,n)
-#     xx, yy = np.meshgrid(x,y)
-#     contour_level = [0,20,40,60,80,200]
-#     diffmap = ["#FFFFFF","#F8DEDE","#F1BEBE","#EB9E9E","#EB7D82"]
-#     cs = plt.contourf(xx,-yy,R,contour_level,colors = diffmap)
-#     plt.colorbar(cs,label = 'risque')
-#     if p > 1:
-#         for k in range(1,p-1):
-#             c = chemin[k]
-#             plt.plot(c[1], -c[0], marker = "x", color = "b")
-#         plt.plot(d[1],-d[0], marker = "o", color = "r", label = "Destination")
-#     plt.legend()
-#     plt.show()
-#
-
 def affiche_trajet(G,R,s,d):
     n = len(G)
     X = []
@@ -152,7 +129,7 @@ def affiche_trajet(G,R,s,d):
     if p > 1:
         for k in range(1,p-1):
             c = chemin[k]
-            plt.plot(c[0], c[1], marker = "x", color = "b")
+            plt.plot(c[0], c[1], marker = "o", markersize=2, color = "y")
         plt.plot(d[0],d[1], marker = "o", color = "r", label = "Destination")
     plt.legend()
     plt.show()

@@ -39,7 +39,7 @@ def repartition(U,t,mmsi, boats, pas, M):
     def conversion(X):
         return np.array([round(X[0]/pas),round(X[1]/pas)])
 
-    for key in boats.keys():#on parcourt tousles bateaux
+    for key in boats.keys():#on parcourt tous les bateaux
         if key != mmsi:#si ce n'est pas le bateau qu'on étudie alors on ajoute du risque
             i=0
             X=np.array([boats[key].get_data()[t][1],boats[key].get_data()[t][2]])
@@ -54,7 +54,6 @@ def repartition(U,t,mmsi, boats, pas, M):
                     i+=1
 
 
-
 boats=ais.calculs_bateaux(input_file)
 
 M=np.zeros((n,n))
@@ -64,13 +63,14 @@ X = np.linspace(0,n,n)
 t = np.linspace(0,n,n)
 X, t = np.meshgrid(X, t, indexing = 'ij')
 
-plt.pcolor(X, t, M,cmap=map_color)
-plt.colorbar()
+plt.pcolor(X, t, M, cmap=map_color, shading="auto")
+#plt.colorbar()
+
 plt.xlabel("Latitude")
 plt.ylabel("Longitude")
 
-#pluscourt chemin
-Gn = dij.graphe(n)
+#plus court chemin
+Gn = dij.graphe4(n)
 sn = (58,40)
 dn = (10,20)
 dij.affiche_trajet(Gn,M,sn,dn)

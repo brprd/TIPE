@@ -39,10 +39,9 @@ def charger_ais(input_file):#pour préparer la simulation en temps réel
 def calculs_bateaux(input_file):#charge les données puis simule le filtre
     data = charger_ais(input_file)
     boats={}
-    for frame in range(len(data)):
-        temps=frame #permet de recommencer l'animation au début plutôt que de planter #frame_offset : DEBUG
-        if not data[temps] == []: #si il y a des données "reçues" durant la seconde représentée par la frame
-            for infos in data[temps]:
+    for t in range(len(data)):
+        if not data[t] == []:
+            for infos in data[t]:
                 mmsi=infos[0] #le bateau est identifié par son mmsi dans le programme
                 if mmsi in boats: #Si le bateau est déjà enregistré,
                     boats[mmsi].append(infos[1]) #on met a jour sa position sa vitesse et son angle,
