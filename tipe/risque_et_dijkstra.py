@@ -16,7 +16,7 @@ def centre_bateau(boats, mmsi,t, M):
         return norme2(x-y)
     boats_out , boats_kal_out = boats[mmsi].get_data() , boats[mmsi].get_kal_data_pred()
     U=np.array([boats_out[t][1],boats_out[t][2]])
-    V=np.array([boats_kal_out[t+2][0],boats_kal_out[t+2][1]])
+    V=np.array([boats_kal_out[t+1][0],boats_kal_out[t+1][1]])
     L=16/3*distance(V,U)
     pas=L/n
     repartition(U,t,mmsi, boats, pas, M)
@@ -27,12 +27,9 @@ def survoisin(J, p, M):
     N=np.zeros((n,n))
     if int(J[0])<n and int(J[1])<n:
         N[int(J[0]),int(J[1])]=p
-        try:
-            for i in range(int(J[0])-10,int(J[0])+10):
-                for j in range(int(J[1])-10,int(J[1])+10):
-                    N[i,j]=int(p*np.exp(-q/2*((J[0]-i)**2+(J[1]-j)**2)))
-        except:
-            None
+        for i in range(int(J[0])-10,int(J[0])+10):
+            for j in range(int(J[1])-10,int(J[1])+10):
+                N[i,j]=int(p*np.exp(-q/2*((J[0]-i)**2+(J[1]-j)**2)))
     M+=N
 
 def repartition(U,t,mmsi, boats, pas, M):
@@ -70,7 +67,7 @@ plt.xlabel("Latitude")
 plt.ylabel("Longitude")
 
 #plus court chemin
-Gn = dij.graphe4(n)
+Gn = dij.graphe(n)
 sn = (58,40)
 dn = (10,20)
 dij.affiche_trajet(Gn,M,sn,dn)
