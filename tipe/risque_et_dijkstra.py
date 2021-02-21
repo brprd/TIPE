@@ -14,7 +14,7 @@ def centre_bateau(boats, mmsi,t, M):
         return np.sqrt(x[0]**2+x[1]**2)
     def distance(x,y):
         return norme2(x-y)
-    boats_out , boats_kal_out = boats[mmsi].get_data() , boats[mmsi].get_kal_data()
+    boats_out , boats_kal_out = boats[mmsi].get_data() , boats[mmsi].get_kal_data_pred()
     U=np.array([boats_out[t][1],boats_out[t][2]])
     V=np.array([boats_kal_out[t+2][0],boats_kal_out[t+2][1]])
     L=16/3*distance(V,U)
@@ -45,11 +45,11 @@ def repartition(U,t,mmsi, boats, pas, M):
             X=np.array([boats[key].get_data()[t][1],boats[key].get_data()[t][2]])
             if np.abs(conversion(X-U)[0])<n//2 and np.abs(conversion(X-U)[1])<n//2:
                 points=[]
-                Y=np.array([boats[key].get_kal_data()[t+1][0],boats[key].get_kal_data()[t+1][1]])
+                Y=np.array([boats[key].get_kal_data_pred()[t+1][0],boats[key].get_kal_data_pred()[t+1][1]])
                 J=conversion(X-U)
                 while i<10 and (np.abs(conversion(J)[0])<n//2-1 and np.abs(conversion(J)[1])<n//2-1):
                     points.append((J+np.array([n//2,n//2])))
-                    survoisin((J+np.array([n//2,n//2])), 1/(boats[mmsi].get_kal_cov()[t][0,0]), M)
+                    survoisin((J+np.array([n//2,n//2])), 1/(boats[mmsi].get_kal_cov_pred()[t][0,0]), M)
                     J=conversion((i/9)*X+(1-i/9)*Y-U)
                     i+=1
 

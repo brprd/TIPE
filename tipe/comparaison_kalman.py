@@ -18,7 +18,7 @@ def distance(x,y):
 boats=ais.calculs_bateaux(input_file)
 
 g=delta_t/60
-boats_out, boats_kal_out = boats[mmsi].get_data(), boats[mmsi].get_kal_data()
+boats_out, boats_kal_out = boats[mmsi].get_data(), boats[mmsi].get_kal_data_pred()
 len_boats_out=len(boats_out)
 len_boats_kal_out=len(boats_kal_out)
 TrX=[boats_out[t][1] for t in range(len_boats_out)]
