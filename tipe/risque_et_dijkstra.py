@@ -1,4 +1,4 @@
-input_file="D:/brieu/Documents/MP/TIPE/tipe/bdd_aleatoire.csv"
+input_file="bdd_aleatoire.csv"
 n=100
 map_color='seismic'
 

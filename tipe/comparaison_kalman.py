@@ -1,4 +1,4 @@
-input_file="D:/brieu/Documents/MP/TIPE/tipe/bdd_aleatoire.csv"
+input_file="bdd_aleatoire.csv"
 mmsi="3337641"
 delta_t =120
 
