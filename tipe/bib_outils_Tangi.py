@@ -39,7 +39,7 @@ def in_matrice(c,n):
 
 
 
-def __carre_centre(c,r):
+def _carre_centre(c,r):
     s = []
     i, j = c[0], c[1]
     s.append((i-r,j))
