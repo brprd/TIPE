@@ -7,16 +7,20 @@ from matplotlib.patches import Ellipse
 #pour Bateau_commande
 import time
 
+
 def produit(ARRAY):#produit matriciel
     P = np.identity(4)
     for M in ARRAY:
         P = np.dot(P,M)
     return P
 
+def gaussienne(x, y, A, varx, vary):
+    return A*np.exp(-1/(2*varx)*x**2-1/(2*vary)*y**2)
+
 class Boat:#bateau de base
-    kal_Q = 1e-7*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
+    kal_Q = 1e-5*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
     kal_R = 1e-7*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matricee de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
-    delta_t_prediction=900#temps pour lequel doit s'effecteur la prédiction
+    delta_t_prediction=3600#temps pour lequel doit s'effecteur la prédiction
 
     def __init__(self, mmsi, vecteur):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
         self._mmsi = mmsi
@@ -72,6 +76,64 @@ class Boat:#bateau de base
         return self._liste_kal_cov_pred
 
 
+#redondances de code avec la classe Boat_graph, propreté à améliorer
+class Boat_risque(Boat):#bateau qui met a jour la carte des risques.
+    R=100
+    def __init__(self, mmsi, vecteur, axes):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
+
+        Boat.__init__(self, mmsi, vecteur)
+
+        self._dot, = axes.plot([],[], marker='o',color='blue',markersize=0, picker=True) #le point représentant la position fournie pas l'AIS sur la carte
+        self._kal_dot, = axes.plot([],[], marker='x',color='green',markersize=0) #le point représentant l'estimation du filtre de Kalman
+
+        self._kal_line, = axes.plot([], [], color='green', markersize=0)
+
+    def _prediction(self, delta_t):#la phase prédiction du filtre de Kalman
+        F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
+        kal_vecteur_prime = produit((F, self._kal_vecteur))
+        kal_P_prime = produit((F, self._kal_P, F.T)) + Boat.kal_Q
+        return kal_vecteur_prime, kal_P_prime
+    def _kalman(self):#le filtre
+        Boat._kalman(self)
+        self._kal_dot.set_data(self._kal_vecteur[1], self._kal_vecteur[0])
+    def append(self, vecteur, M, scale, lat_min, lon_min):#met à jour le bateau avec le vecteur passé en paramètre
+        Boat.append(self, vecteur)#self.__liste_vecteurs.append(vecteur)
+        self._dot.set_data(vecteur[2], vecteur[1])#modifie la position AIS affichée
+        if len(self._liste_vecteurs) >= 2:#kalman utilise l'instant t+1
+            self._kalman()#calcule et affiche la position estimée du bateau à l'instant même
+            kal_vecteur_prime, kal_P_prime = self._predire(Boat.delta_t_prediction)#prédit la position du bateau
+            self._kal_line.set_data([self._liste_vecteurs[-1][2], kal_vecteur_prime[1]], [self._liste_vecteurs[-1][1], kal_vecteur_prime[0]])
+            self._risque_update(M, scale, kal_vecteur_prime, kal_P_prime, lat_min, lon_min)
+    def _risque_update(self, M, scale, kal_vecteur_prime, kal_P_prime, lat_min, lon_min):
+        R=Boat_risque.R
+
+        #position du bateau
+        COV = self._liste_kal_cov[-1]
+        varx, vary = COV[0,0], COV[1,1]
+
+        x=np.linspace(-R,R, num=2*R)
+        y=x
+        x, y = np.meshgrid(x, y)
+
+        vect = self._liste_vecteurs[-1]
+        posx, posy = round((vect[2] - lon_min)*scale), round((vect[1] - lat_min)*scale)
+        MAT = gaussienne(x, y, 100, 10e7*varx, 10e7*vary)
+        #M[posy-R:posy+R, posx-R:posx+R] = M[posy-R:posy+R, posx-R:posx+R] + MAT
+
+        #position prédite
+        COV = kal_P_prime
+        varx, vary = COV[0,0], COV[1,1]
+
+        x=np.linspace(-R,R, num=2*R)
+        y=x
+        x, y = np.meshgrid(x, y)
+
+        vect = kal_vecteur_prime
+        posx, posy = round((vect[1] - lon_min)*scale), round((vect[0] - lat_min)*scale)
+        MAT = gaussienne(x, y, 100, 3*10e1*varx, 3*10e1*vary)
+        M[posy-R:posy+R, posx-R:posx+R] = M[posy-R:posy+R, posx-R:posx+R] + MAT
+
+
 class Boat_graph(Boat):#bateau avec fonctionnalités graphiques
     def __init__(self, mmsi, vecteur, axes, figure):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
 
@@ -120,7 +182,6 @@ class Boat_graph(Boat):#bateau avec fonctionnalités graphiques
             print("latitude : " + str(round(self._kal_vecteur[0], 4)) + " ± " + str(round(2*self._kal_P[0][0], 4)) + "°")
             print("longitude : " + str(round(self._kal_vecteur[1], 4)) + " ± " + str(round(2*self._kal_P[1][1], 4)) + "°")
             print("nombres de mesures reçues : " + str(len(self._liste_vecteurs)))
-
 
 
 class Bateau_commande:

@@ -48,5 +48,3 @@ def calculs_bateaux(input_file):#charge les données puis simule le filtre
                 else: #sinon,
                     boats[mmsi]=bateau.Boat(mmsi,infos[1]) #on en crée un nouveau.
     return boats
-
-
