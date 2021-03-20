@@ -1,4 +1,4 @@
-input_file='TIPE-master/bdd2.csv'
+input_file='bdd.csv'
 
 scale=200
 
