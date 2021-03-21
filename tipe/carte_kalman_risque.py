@@ -1,18 +1,15 @@
-input_file='bdd.csv'
+input_file='bdd2.csv'
 
 scale=200
 
-n, m = 8,8
-latitude_min = 40
+n, m = 4,4
+latitude_min = 42
 latitude_max = latitude_min + n
-longitude_min = -71
+longitude_min = -70
 longitude_max = longitude_min + m
-
-
 n, m = n*scale, m*scale
 
-#time_scale=10#time_scale=x => le temps s'écoule x fois plus vite qu'en vrai
-
+colormap='jet'#seismic'
 
 frame_offset=0
 #interval=int(1000/time_scale) #ne pas toucher, modifier time_scale au-dessus
@@ -25,17 +22,23 @@ pi = 3.141592
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.colors import LogNorm
 import cartopy.crs as ccrs #à installer avec "pip install Cartopy-0.18.0-cp38-cp38-win_amd64.whl" (problèmes de dépendances si installé depuis les dépots de Python)
 
 import bib_ais as ais
 import bib_bateau as bat
+import bib_dijkstra as dij
 
 data=[] #contient les données du fichier d'entrée
 boats={} #se remplit des bateaux détectés au fur et à mesure
 bateau_commande=False
 
+if n != m:
+    raise Exception("n doit être égal à m pour dijkstra")
+else:
+    Graphe = dij.graphe(n)
 
-M=np.zeros((n,m))
+M=np.ones((n,m))
 x=np.linspace(0,m, num=m)
 y=np.linspace(0,n, num=n)
 x, y = np.meshgrid(x, y)
@@ -87,16 +90,20 @@ def update(frame):
                 boats[mmsi]=bat.Boat_risque(mmsi, infos[1], axes) #on en crée un nouveau
                 boats[mmsi].append(infos[1], M, scale, latitude_min, longitude_min)#on met a jour sa position, sa vitesse et son angle.
 
-    M=M*1-1e-9
+    #dn = (n-1,n-1)
+    #sn = (0,0)
+    #chemin=dij.trajet(Graphe,M,sn,dn)[1]
+    #dij.affiche_trajet2(chemin, scale, latitude_min, longitude_min)
 
-    if bateau_commande:
-        bateau_commande.calculer_position(axes)
+    M=M*(1-1e-1)
+
     if frame%1==0:
         im.remove()
-        im = axes.imshow(M, extent=[longitude_min, longitude_max, latitude_min, latitude_max], interpolation=None, cmap='seismic', alpha=1, origin='lower')
+        im = axes.imshow(M, extent=[longitude_min, longitude_max, latitude_min, latitude_max], interpolation=None, cmap=colormap, alpha=1, norm=LogNorm(), origin='lower')
+    if bateau_commande:
+        bateau_commande.calculer_position(axes)
     return []
 
 
 anim = animation.FuncAnimation(figure, update, interval=interval) #cette fonction permet d'appeler la fonction "update" tous les interval ms
-
 plt.show() #affiche la fenetre

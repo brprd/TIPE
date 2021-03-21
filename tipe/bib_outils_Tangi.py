@@ -5,7 +5,7 @@ def obstacle(R,o):
     rm = o[2]
     R[i][j] = R[i][j] + rm
     for r in range(1,k):
-        s = __carre_centre((i,j),r)
+        s = _carre_centre((i,j),r)
         for c in s:
             if in_matrice(c,n):
                 R[c[0]][c[1]] = R[c[0]][c[1]] + (rm//(r+1))
@@ -18,7 +18,7 @@ def retire_obstacle(R,o):
     rm = o[2]
     R[i][j] = R[i][j] - rm
     for r in range(1,k):
-        s = __carre_centre((i,j),r)
+        s = _carre_centre((i,j),r)
         for c in s:
             if in_matrice(c,n):
                 R[c[0]][c[1]] = R[c[0]][c[1]] - (rm//(r+1))

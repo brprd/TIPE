@@ -131,5 +131,23 @@ def affiche_trajet(G,R,s,d):
             c = chemin[k]
             plt.plot(c[0], c[1], marker = "o", markersize=2, color = "y")
         plt.plot(d[0],d[1], marker = "o", color = "r", label = "Destination")
-    plt.legend()
-    plt.show()
+    #plt.legend()
+    #plt.show()
+
+
+
+dernier_trajet = 0
+def affiche_trajet2(chemin, scale, lat_min, lon_min):
+    global dernier_trajet
+    p = len(chemin)
+    if p > 1:
+        LAT, LON = [], []
+        for k in range(1,p-1):
+            c = chemin[k]
+            lon, lat = c[0]/scale + lon_min, c[1]/scale + lat_min
+            LON.append(lon)
+            LAT.append(lat)
+        if dernier_trajet:
+            dernier_trajet, = dernier_trajet
+            dernier_trajet.remove()
+        dernier_trajet = plt.plot(LON, LAT, marker = "o", markersize=2, linestyle='None', color = "y")

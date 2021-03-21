@@ -18,9 +18,9 @@ def gaussienne(x, y, A, varx, vary):
     return A*np.exp(-1/(2*varx)*x**2-1/(2*vary)*y**2)
 
 class Boat:#bateau de base
-    kal_Q = 1e-5*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
+    kal_Q = 1e-6*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matrice de covariance du bruit du modèle physique
     kal_R = 1e-7*np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]) #matricee de covariance liée aux bruits des capteurs (donné par le constructeur du capteur)
-    delta_t_prediction=3600#temps pour lequel doit s'effecteur la prédiction
+    delta_t_prediction=300#temps pour lequel doit s'effecteur la prédiction
 
     def __init__(self, mmsi, vecteur):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
         self._mmsi = mmsi
@@ -79,14 +79,14 @@ class Boat:#bateau de base
 #redondances de code avec la classe Boat_graph, propreté à améliorer
 class Boat_risque(Boat):#bateau qui met a jour la carte des risques.
     R=100
+    delta_t_prediction_L = [x*50 for x in range(0,10)]
     def __init__(self, mmsi, vecteur, axes):#vecteur = [instant, latitude, longitude, vitesse_latitudinale, vitesse_longitudinale]
 
         Boat.__init__(self, mmsi, vecteur)
 
-        self._dot, = axes.plot([],[], marker='o',color='blue',markersize=0, picker=True) #le point représentant la position fournie pas l'AIS sur la carte
+        self._dot, = axes.plot([],[], marker='o',color='red',markersize=0) #le point représentant la position fournie pas l'AIS sur la carte
         self._kal_dot, = axes.plot([],[], marker='x',color='green',markersize=0) #le point représentant l'estimation du filtre de Kalman
 
-        self._kal_line, = axes.plot([], [], color='green', markersize=0)
 
     def _prediction(self, delta_t):#la phase prédiction du filtre de Kalman
         F = np.array([[1,0,delta_t,0],[0,1,0,delta_t],[0,0,1,0],[0,0,0,1]]) #matrice représentant le modèle physique
@@ -101,37 +101,27 @@ class Boat_risque(Boat):#bateau qui met a jour la carte des risques.
         self._dot.set_data(vecteur[2], vecteur[1])#modifie la position AIS affichée
         if len(self._liste_vecteurs) >= 2:#kalman utilise l'instant t+1
             self._kalman()#calcule et affiche la position estimée du bateau à l'instant même
-            kal_vecteur_prime, kal_P_prime = self._predire(Boat.delta_t_prediction)#prédit la position du bateau
-            self._kal_line.set_data([self._liste_vecteurs[-1][2], kal_vecteur_prime[1]], [self._liste_vecteurs[-1][1], kal_vecteur_prime[0]])
-            self._risque_update(M, scale, kal_vecteur_prime, kal_P_prime, lat_min, lon_min)
-    def _risque_update(self, M, scale, kal_vecteur_prime, kal_P_prime, lat_min, lon_min):
+            predictions=[]
+            for delta_t in Boat_risque.delta_t_prediction_L:
+                predictions.append(self._predire(delta_t))#prédit la position du bateau
+            self._risque_update(M, scale, predictions, lat_min, lon_min)
+    def _risque_update(self, M, scale, predictions, lat_min, lon_min):
         R=Boat_risque.R
 
-        #position du bateau
-        COV = self._liste_kal_cov[-1]
-        varx, vary = COV[0,0], COV[1,1]
+        for pred in predictions:
 
-        x=np.linspace(-R,R, num=2*R)
-        y=x
-        x, y = np.meshgrid(x, y)
+            vect = pred[0]
+            COV = pred[1]
 
-        vect = self._liste_vecteurs[-1]
-        posx, posy = round((vect[2] - lon_min)*scale), round((vect[1] - lat_min)*scale)
-        MAT = gaussienne(x, y, 100, 10e7*varx, 10e7*vary)
-        #M[posy-R:posy+R, posx-R:posx+R] = M[posy-R:posy+R, posx-R:posx+R] + MAT
+            varx, vary = COV[0,0], COV[1,1]
 
-        #position prédite
-        COV = kal_P_prime
-        varx, vary = COV[0,0], COV[1,1]
+            x=np.linspace(-R,R, num=2*R)
+            y=x
+            x, y = np.meshgrid(x, y)
 
-        x=np.linspace(-R,R, num=2*R)
-        y=x
-        x, y = np.meshgrid(x, y)
-
-        vect = kal_vecteur_prime
-        posx, posy = round((vect[1] - lon_min)*scale), round((vect[0] - lat_min)*scale)
-        MAT = gaussienne(x, y, 100, 3*10e1*varx, 3*10e1*vary)
-        M[posy-R:posy+R, posx-R:posx+R] = M[posy-R:posy+R, posx-R:posx+R] + MAT
+            posx, posy = round((vect[1] - lon_min)*scale), round((vect[0] - lat_min)*scale)
+            MAT = gaussienne(x, y, 100, 5*10e1*varx, 5*10e1*vary)
+            M[posy-R:posy+R, posx-R:posx+R] = M[posy-R:posy+R, posx-R:posx+R] + MAT
 
 
 class Boat_graph(Boat):#bateau avec fonctionnalités graphiques
